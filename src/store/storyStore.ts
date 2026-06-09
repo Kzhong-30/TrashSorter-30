@@ -51,7 +51,7 @@ interface StoryStore extends StoryState {
   selectChapter: (chapterId: string | null) => void;
   selectBlock: (blockId: string | null) => void;
 
-  addChapter: (parentId: string | null, optionLabel?: string) => Chapter;
+  addChapter: (parentId: string | null, optionLabel?: string, autoSelect?: boolean) => Chapter;
   updateChapter: (chapterId: string, updates: Partial<Chapter>) => void;
   deleteChapter: (chapterId: string) => void;
   duplicateChapter: (chapterId: string) => Chapter | null;
@@ -132,7 +132,7 @@ export const useStoryStore = create<StoryStore>()(
 
       selectBlock: (blockId) => set({ selectedBlockId: blockId }),
 
-      addChapter: (parentId, optionLabel) => {
+      addChapter: (parentId, optionLabel, autoSelect = true) => {
         const newChapter: Chapter = {
           id: generateId(),
           title: optionLabel ? `分支：${optionLabel}` : "新章节",
@@ -148,7 +148,7 @@ export const useStoryStore = create<StoryStore>()(
             chapters: { ...s.project.chapters, [newChapter.id]: newChapter },
             updatedAt: Date.now(),
           },
-          selectedChapterId: newChapter.id,
+          selectedChapterId: autoSelect ? newChapter.id : s.selectedChapterId,
         }));
         return newChapter;
       },

@@ -217,6 +217,7 @@ export default function Toolbar() {
     togglePreviewMode,
     resetProject,
     loadProject,
+    isPreviewMode,
   } = useStoryStore();
 
   const [showMenu, setShowMenu] = useState(false);
@@ -228,6 +229,7 @@ export default function Toolbar() {
   const [bgSoundPlaying, setBgSoundPlaying] = useState(false);
   const [bgVolume, setBgVolume] = useState(0.3);
   const bgSoundRef = useRef<HTMLAudioElement | null>(null);
+  const bgSoundWrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     document.title = project.title
@@ -253,6 +255,34 @@ export default function Toolbar() {
       bgSoundRef.current.volume = bgVolume;
     }
   }, [bgVolume]);
+
+  useEffect(() => {
+    if (isPreviewMode) {
+      bgSoundRef.current?.pause();
+      setBgSoundPlaying(false);
+    }
+  }, [isPreviewMode]);
+
+  useEffect(() => {
+    if (!showBgSound) {
+      bgSoundRef.current?.pause();
+      setBgSoundPlaying(false);
+    }
+  }, [showBgSound]);
+
+  useEffect(() => {
+    if (!showBgSound) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        bgSoundWrapRef.current &&
+        !bgSoundWrapRef.current.contains(e.target as Node)
+      ) {
+        setShowBgSound(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showBgSound]);
 
   const toggleBgSoundPlay = () => {
     if (!bgSoundRef.current || !project.bgSoundUrl) return;
@@ -431,7 +461,7 @@ export default function Toolbar() {
             )}
           </div>
 
-          <div className="relative">
+          <div ref={bgSoundWrapRef} className="relative">
             <button
               onClick={() => setShowBgSound(!showBgSound)}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all text-sm ${

@@ -28,7 +28,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+        className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm"
         onClick={onCancel}
       >
         <motion.div
@@ -36,15 +36,15 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           animate={{ scale: 1, y: 0, opacity: 1 }}
           exit={{ scale: 0.9, y: 20, opacity: 0 }}
           transition={{ type: "spring", stiffness: 350, damping: 28 }}
-          className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+          className="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-700 p-6 shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="mb-4 flex items-start gap-3">
             <div
               className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
                 confirmDanger
-                  ? "bg-red-100 text-red-600"
-                  : "bg-indigo-100 text-indigo-600"
+                  ? "bg-red-500/20 text-red-400"
+                  : "bg-violet-500/20 text-violet-400"
               }`}
             >
               <svg
@@ -70,14 +70,14 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
               </svg>
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-bold text-gray-900">{title}</h3>
-              <div className="mt-2 text-sm text-gray-600">{message}</div>
+              <h3 className="text-lg font-bold text-white">{title}</h3>
+              <div className="mt-2 text-sm text-slate-400">{message}</div>
             </div>
           </div>
           <div className="mt-6 flex justify-end gap-2">
             <button
               onClick={onCancel}
-              className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+              className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-700 hover:text-white"
             >
               {cancelText}
             </button>
@@ -85,8 +85,8 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
               onClick={onConfirm}
               className={`rounded-lg px-4 py-2 text-sm font-semibold text-white transition ${
                 confirmDanger
-                  ? "bg-red-500 hover:bg-red-600 shadow-sm shadow-red-200"
-                  : "bg-indigo-500 hover:bg-indigo-600 shadow-sm shadow-indigo-200"
+                  ? "bg-red-500 hover:bg-red-600 shadow-sm shadow-red-500/30"
+                  : "bg-violet-500 hover:bg-violet-600 shadow-sm shadow-violet-500/30"
               }`}
             >
               {confirmText}

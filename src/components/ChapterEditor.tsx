@@ -19,6 +19,7 @@ import {
   Pause,
   ImageOff,
   Film,
+  Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
@@ -44,6 +45,15 @@ interface BlockEditorProps {
   index: number;
   total: number;
 }
+
+const LoadingMediaPlaceholder: React.FC<{
+  text: string;
+}> = ({ text }) => (
+  <div className="w-full h-48 rounded-xl bg-slate-900/50 border border-slate-700/50 flex flex-col items-center justify-center gap-2 text-slate-500 animate-pulse">
+    <Loader2 size={28} className="animate-spin text-violet-400" />
+    <span className="text-xs">{text}</span>
+  </div>
+);
 
 const FailedMediaPlaceholder: React.FC<{
   icon: React.ReactNode;
@@ -71,7 +81,9 @@ function BlockEditor({ block, chapterId, index, total }: BlockEditorProps) {
   } = useStoryStore();
 
   const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
   const [videoError, setVideoError] = useState(false);
+  const [videoLoading, setVideoLoading] = useState(true);
   const [jumpPrompt, setJumpPrompt] = useState<{
     open: boolean;
     newChapterId: string | null;
@@ -85,8 +97,14 @@ function BlockEditor({ block, chapterId, index, total }: BlockEditorProps) {
   const chapters = Object.values(project.chapters);
 
   useEffect(() => {
-    if (block.type === "image") setImageError(false);
-    if (block.type === "video") setVideoError(false);
+    if (block.type === "image") {
+      setImageError(false);
+      setImageLoading(true);
+    }
+    if (block.type === "video") {
+      setVideoError(false);
+      setVideoLoading(true);
+    }
   }, [block.content, block.type]);
 
   return (
@@ -184,6 +202,8 @@ function BlockEditor({ block, chapterId, index, total }: BlockEditorProps) {
                   icon={<ImageOff size={20} />}
                   text="图片加载失败，请检查 URL 是否正确"
                 />
+              ) : imageLoading ? (
+                <LoadingMediaPlaceholder text="图片加载中..." />
               ) : (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
@@ -195,6 +215,7 @@ function BlockEditor({ block, chapterId, index, total }: BlockEditorProps) {
                     alt="预览"
                     className="w-full max-h-64 object-cover"
                     onError={() => setImageError(true)}
+                    onLoad={() => setImageLoading(false)}
                   />
                 </motion.div>
               )
@@ -220,6 +241,8 @@ function BlockEditor({ block, chapterId, index, total }: BlockEditorProps) {
                   icon={<Film size={20} />}
                   text="视频加载失败，请检查 URL 是否正确"
                 />
+              ) : videoLoading ? (
+                <LoadingMediaPlaceholder text="视频加载中..." />
               ) : (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
@@ -231,6 +254,7 @@ function BlockEditor({ block, chapterId, index, total }: BlockEditorProps) {
                     controls
                     className="w-full max-h-64"
                     onError={() => setVideoError(true)}
+                    onLoadedData={() => setVideoLoading(false)}
                   />
                 </motion.div>
               )
@@ -300,7 +324,7 @@ function BlockEditor({ block, chapterId, index, total }: BlockEditorProps) {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        const newCh = addChapter(chapterId, choice.label);
+                        const newCh = addChapter(chapterId, choice.label, false);
                         updateChoice(chapterId, block.id, choice.id, {
                           nextChapterId: newCh.id,
                         });
@@ -355,14 +379,14 @@ function BlockEditor({ block, chapterId, index, total }: BlockEditorProps) {
         }
         message={
           <div className="space-y-2">
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-slate-400">
               分支章节
-              <span className="mx-1 font-semibold text-violet-600">
+              <span className="mx-1 font-semibold text-violet-400">
                 「{jumpPrompt.newChapterTitle}」
               </span>
               已成功创建并关联到当前选项。
             </p>
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-slate-400">
               是否跳转到新章节继续撰写？默认保持在当前页面，您可以稍后从左侧故事树中选择它。
             </p>
           </div>
@@ -381,6 +405,7 @@ export default function ChapterEditor() {
     updateTransition,
     updateChapterBgMusic,
     updateChapterBgImage,
+    isPreviewMode,
   } = useStoryStore();
 
   const [showSettings, setShowSettings] = useState(false);
@@ -414,6 +439,13 @@ export default function ChapterEditor() {
       chapterMusicRef.current.volume = chapterVolume;
     }
   }, [chapterVolume]);
+
+  useEffect(() => {
+    if (isPreviewMode) {
+      chapterMusicRef.current?.pause();
+      setChapterMusicPlaying(false);
+    }
+  }, [isPreviewMode]);
 
   const toggleChapterMusic = () => {
     if (!chapterMusicRef.current || !chapter?.bgMusicUrl) return;

@@ -211,12 +211,22 @@ export default function StoryTree() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-1">
-        {rootChapter ? (
-          <TreeNode
-            chapter={rootChapter}
-            level={0}
-            childrenIds={rootChildren}
-          />
+        {rootChapter || Object.values(project.chapters).length > 0 ? (
+          Object.values(project.chapters)
+            .filter((c) => c.parentId === null)
+            .map((topChapter) => {
+              const topChildren = Object.values(project.chapters)
+                .filter((c) => c.parentId === topChapter.id)
+                .map((c) => c.id);
+              return (
+                <TreeNode
+                  key={topChapter.id}
+                  chapter={topChapter}
+                  level={0}
+                  childrenIds={topChildren}
+                />
+              );
+            })
         ) : (
           <div className="text-center text-slate-500 py-8 text-sm">
             暂无章节
