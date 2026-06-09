@@ -15,9 +15,14 @@ import {
   Link2,
   ArrowRight,
   X,
+  Play,
+  Pause,
+  ImageOff,
+  Film,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ConfirmModal } from "./ConfirmModal";
 
 const blockTypeConfig: Record<
   BlockType,
@@ -40,6 +45,16 @@ interface BlockEditorProps {
   total: number;
 }
 
+const FailedMediaPlaceholder: React.FC<{
+  icon: React.ReactNode;
+  text: string;
+}> = ({ icon, text }) => (
+  <div className="w-full h-48 rounded-xl bg-slate-900/80 border border-slate-700/50 flex flex-col items-center justify-center gap-2 text-slate-500">
+    <div className="p-3 rounded-full bg-slate-800">{icon}</div>
+    <span className="text-xs">{text}</span>
+  </div>
+);
+
 function BlockEditor({ block, chapterId, index, total }: BlockEditorProps) {
   const {
     selectedBlockId,
@@ -52,13 +67,27 @@ function BlockEditor({ block, chapterId, index, total }: BlockEditorProps) {
     deleteChoice,
     project,
     addChapter,
+    selectChapter,
   } = useStoryStore();
+
+  const [imageError, setImageError] = useState(false);
+  const [videoError, setVideoError] = useState(false);
+  const [jumpPrompt, setJumpPrompt] = useState<{
+    open: boolean;
+    newChapterId: string | null;
+    newChapterTitle: string;
+  }>({ open: false, newChapterId: null, newChapterTitle: "" });
 
   const isSelected = selectedBlockId === block.id;
   const config = blockTypeConfig[block.type];
   const Icon = config.icon;
 
   const chapters = Object.values(project.chapters);
+
+  useEffect(() => {
+    if (block.type === "image") setImageError(false);
+    if (block.type === "video") setVideoError(false);
+  }, [block.content, block.type]);
 
   return (
     <motion.div
@@ -87,14 +116,15 @@ function BlockEditor({ block, chapterId, index, total }: BlockEditorProps) {
           {index + 1}. {config.label}块
         </span>
         <div className="flex-1" />
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-0.5">
           <button
             onClick={(e) => {
               e.stopPropagation();
               moveBlock(chapterId, block.id, "up");
             }}
             disabled={index === 0}
-            className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+            className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            title="上移"
           >
             <ChevronUp size={14} />
           </button>
@@ -104,7 +134,8 @@ function BlockEditor({ block, chapterId, index, total }: BlockEditorProps) {
               moveBlock(chapterId, block.id, "down");
             }}
             disabled={index === total - 1}
-            className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+            className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            title="下移"
           >
             <ChevronDown size={14} />
           </button>
@@ -113,7 +144,8 @@ function BlockEditor({ block, chapterId, index, total }: BlockEditorProps) {
               e.stopPropagation();
               deleteBlock(chapterId, block.id);
             }}
-            className="p-1.5 rounded-lg hover:bg-red-500/20 text-slate-400 hover:text-red-400"
+            className="p-1.5 rounded-lg hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors"
+            title="删除"
           >
             <Trash2 size={14} />
           </button>
@@ -146,22 +178,27 @@ function BlockEditor({ block, chapterId, index, total }: BlockEditorProps) {
               placeholder="输入图片 URL..."
               className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 text-sm"
             />
-            {block.content && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="rounded-xl overflow-hidden border border-slate-700/50"
-              >
-                <img
-                  src={block.content}
-                  alt="预览"
-                  className="w-full max-h-64 object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = "none";
-                  }}
+            {block.content ? (
+              imageError ? (
+                <FailedMediaPlaceholder
+                  icon={<ImageOff size={20} />}
+                  text="图片加载失败，请检查 URL 是否正确"
                 />
-              </motion.div>
-            )}
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="rounded-xl overflow-hidden border border-slate-700/50"
+                >
+                  <img
+                    src={block.content}
+                    alt="预览"
+                    className="w-full max-h-64 object-cover"
+                    onError={() => setImageError(true)}
+                  />
+                </motion.div>
+              )
+            ) : null}
           </div>
         )}
 
@@ -177,19 +214,27 @@ function BlockEditor({ block, chapterId, index, total }: BlockEditorProps) {
               placeholder="输入视频 URL (mp4)..."
               className="w-full bg-slate-900/50 border border-slate-700/50 rounded-xl px-4 py-2.5 text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 text-sm"
             />
-            {block.content && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="rounded-xl overflow-hidden border border-slate-700/50 bg-black"
-              >
-                <video
-                  src={block.content}
-                  controls
-                  className="w-full max-h-64"
+            {block.content ? (
+              videoError ? (
+                <FailedMediaPlaceholder
+                  icon={<Film size={20} />}
+                  text="视频加载失败，请检查 URL 是否正确"
                 />
-              </motion.div>
-            )}
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="rounded-xl overflow-hidden border border-slate-700/50 bg-black"
+                >
+                  <video
+                    src={block.content}
+                    controls
+                    className="w-full max-h-64"
+                    onError={() => setVideoError(true)}
+                  />
+                </motion.div>
+              )
+            ) : null}
           </div>
         )}
 
@@ -206,7 +251,7 @@ function BlockEditor({ block, chapterId, index, total }: BlockEditorProps) {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
-                  className="group bg-slate-900/50 rounded-xl p-3 border border-slate-700/50"
+                  className="bg-slate-900/50 rounded-xl p-3 border border-slate-700/50"
                 >
                   <div className="flex gap-2 items-start mb-2">
                     <div className="flex-1">
@@ -228,7 +273,7 @@ function BlockEditor({ block, chapterId, index, total }: BlockEditorProps) {
                         e.stopPropagation();
                         deleteChoice(chapterId, block.id, choice.id);
                       }}
-                      className="p-1.5 rounded-lg hover:bg-red-500/20 text-slate-500 hover:text-red-400 shrink-0"
+                      className="p-1.5 rounded-lg hover:bg-red-500/20 text-slate-500 hover:text-red-400 shrink-0 transition-colors"
                     >
                       <X size={14} />
                     </button>
@@ -259,8 +304,13 @@ function BlockEditor({ block, chapterId, index, total }: BlockEditorProps) {
                         updateChoice(chapterId, block.id, choice.id, {
                           nextChapterId: newCh.id,
                         });
+                        setJumpPrompt({
+                          open: true,
+                          newChapterId: newCh.id,
+                          newChapterTitle: newCh.title,
+                        });
                       }}
-                      className="flex items-center gap-1 px-2 py-1.5 bg-violet-500/20 text-violet-400 rounded-lg hover:bg-violet-500/30 text-xs shrink-0"
+                      className="flex items-center gap-1 px-2 py-1.5 bg-violet-500/20 text-violet-400 rounded-lg hover:bg-violet-500/30 text-xs shrink-0 transition-colors"
                     >
                       <Plus size={12} />
                       新建
@@ -288,6 +338,36 @@ function BlockEditor({ block, chapterId, index, total }: BlockEditorProps) {
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        open={jumpPrompt.open}
+        title="新章节已创建"
+        confirmText="立即跳转"
+        cancelText="留在这里继续编辑"
+        onConfirm={() => {
+          if (jumpPrompt.newChapterId) {
+            selectChapter(jumpPrompt.newChapterId);
+          }
+          setJumpPrompt({ open: false, newChapterId: null, newChapterTitle: "" });
+        }}
+        onCancel={() =>
+          setJumpPrompt({ open: false, newChapterId: null, newChapterTitle: "" })
+        }
+        message={
+          <div className="space-y-2">
+            <p className="text-sm text-slate-600">
+              分支章节
+              <span className="mx-1 font-semibold text-violet-600">
+                「{jumpPrompt.newChapterTitle}」
+              </span>
+              已成功创建并关联到当前选项。
+            </p>
+            <p className="text-sm text-slate-600">
+              是否跳转到新章节继续撰写？默认保持在当前页面，您可以稍后从左侧故事树中选择它。
+            </p>
+          </div>
+        }
+      />
     </motion.div>
   );
 }
@@ -304,10 +384,46 @@ export default function ChapterEditor() {
   } = useStoryStore();
 
   const [showSettings, setShowSettings] = useState(false);
+  const [chapterMusicPlaying, setChapterMusicPlaying] = useState(false);
+  const [chapterVolume, setChapterVolume] = useState(0.5);
+  const chapterMusicRef = useRef<HTMLAudioElement | null>(null);
 
   const chapter = selectedChapterId
     ? project.chapters[selectedChapterId]
     : null;
+
+  useEffect(() => {
+    setChapterMusicPlaying(false);
+    if (chapterMusicRef.current) {
+      chapterMusicRef.current.pause();
+      chapterMusicRef.current = null;
+    }
+    if (chapter?.bgMusicUrl) {
+      chapterMusicRef.current = new Audio(chapter.bgMusicUrl);
+      chapterMusicRef.current.loop = true;
+      chapterMusicRef.current.volume = chapterVolume;
+    }
+    return () => {
+      chapterMusicRef.current?.pause();
+      chapterMusicRef.current = null;
+    };
+  }, [selectedChapterId, chapter?.bgMusicUrl]);
+
+  useEffect(() => {
+    if (chapterMusicRef.current) {
+      chapterMusicRef.current.volume = chapterVolume;
+    }
+  }, [chapterVolume]);
+
+  const toggleChapterMusic = () => {
+    if (!chapterMusicRef.current || !chapter?.bgMusicUrl) return;
+    if (chapterMusicPlaying) {
+      chapterMusicRef.current.pause();
+    } else {
+      chapterMusicRef.current.play().catch(() => {});
+    }
+    setChapterMusicPlaying(!chapterMusicPlaying);
+  };
 
   if (!chapter) {
     return (
@@ -347,10 +463,12 @@ export default function ChapterEditor() {
               className="w-full bg-transparent text-2xl font-bold text-white placeholder-slate-500 focus:outline-none border-b-2 border-transparent focus:border-violet-500 pb-1"
               placeholder="章节标题..."
             />
-            <div className="flex gap-3 text-xs text-slate-400">
+            <div className="flex gap-3 text-xs text-slate-400 flex-wrap">
               <span>
                 章节 ID:{" "}
-                <code className="text-violet-400">{chapter.id.slice(0, 8)}</code>
+                <code className="text-violet-400">
+                  {chapter.id.slice(0, 8)}
+                </code>
               </span>
               <span>•</span>
               <span>{chapter.blocks.length} 个内容块</span>
@@ -358,7 +476,17 @@ export default function ChapterEditor() {
                 <>
                   <span>•</span>
                   <span className="text-sky-400">
-                    父章节: {project.chapters[chapter.parentId]?.title || "未知"}
+                    父章节:{" "}
+                    {project.chapters[chapter.parentId]?.title || "未知"}
+                  </span>
+                </>
+              )}
+              {chapter.bgMusicUrl && (
+                <>
+                  <span>•</span>
+                  <span className="text-purple-400 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+                    已配配乐
                   </span>
                 </>
               )}
@@ -371,6 +499,7 @@ export default function ChapterEditor() {
                 ? "bg-violet-500/20 text-violet-400 border border-violet-500/50"
                 : "bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700"
             }`}
+            title="章节设置"
           >
             <Settings size={18} />
           </button>
@@ -384,7 +513,7 @@ export default function ChapterEditor() {
               exit={{ height: 0, opacity: 0 }}
               className="overflow-hidden"
             >
-              <div className="pt-4 mt-4 border-t border-slate-700/50 grid grid-cols-2 gap-4">
+              <div className="pt-4 mt-4 border-t border-slate-700/50 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
                     <Palette size={12} /> 背景图片 URL
@@ -415,9 +544,45 @@ export default function ChapterEditor() {
                         e.target.value || undefined
                       )
                     }
-                    placeholder="可选：背景音乐..."
+                    placeholder="可选：背景音乐 (mp3/wav)..."
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-violet-500"
                   />
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      onClick={toggleChapterMusic}
+                      disabled={!chapter.bgMusicUrl}
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                        chapterMusicPlaying
+                          ? "bg-purple-500 text-white shadow-sm shadow-purple-500/30"
+                          : "bg-slate-700 text-slate-200 hover:bg-slate-600"
+                      }`}
+                    >
+                      {chapterMusicPlaying ? (
+                        <>
+                          <Pause size={12} /> 暂停
+                        </>
+                      ) : (
+                        <>
+                          <Play size={12} /> 试听
+                        </>
+                      )}
+                    </button>
+                    <span className="text-slate-500 text-xs w-10">
+                      {Math.round(chapterVolume * 100)}%
+                    </span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={chapterVolume}
+                      onChange={(e) =>
+                        setChapterVolume(parseFloat(e.target.value))
+                      }
+                      className="flex-1 accent-purple-500 disabled:opacity-50"
+                      disabled={!chapter.bgMusicUrl}
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-slate-400">
@@ -473,7 +638,7 @@ export default function ChapterEditor() {
                               direction: dir,
                             })
                           }
-                          className={`flex-1 py-1 px-2 rounded text-xs ${
+                          className={`flex-1 py-1 px-2 rounded text-xs transition-colors ${
                             chapter.transition.direction === dir
                               ? "bg-violet-500/30 text-violet-300"
                               : "bg-slate-800 text-slate-500 hover:bg-slate-700"
@@ -511,7 +676,7 @@ export default function ChapterEditor() {
             ))}
           </AnimatePresence>
 
-          <div className="grid grid-cols-4 gap-3 pt-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4">
             {(Object.keys(blockTypeConfig) as BlockType[]).map((type) => {
               const cfg = blockTypeConfig[type];
               const I = cfg.icon;

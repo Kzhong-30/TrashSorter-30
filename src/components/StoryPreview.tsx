@@ -48,6 +48,12 @@ const getTransitionVariants = (transition: TransitionConfig) => {
         animate: { opacity: 1, rotateY: 0 },
         exit: { opacity: 0, rotateY: 90 },
         transition: { duration, ease },
+        style: {
+          transformStyle: "preserve-3d",
+          backfaceVisibility: "hidden",
+          WebkitTransformStyle: "preserve-3d",
+          WebkitBackfaceVisibility: "hidden",
+        },
       };
     case "fade":
     default:
@@ -69,6 +75,7 @@ interface ChapterViewProps {
 
 function ChapterView({ chapter, onChoice, onBack, canGoBack }: ChapterViewProps) {
   const variants = getTransitionVariants(chapter.transition);
+  const isFlip = chapter.transition.type === "flip";
 
   return (
     <motion.div
@@ -80,6 +87,12 @@ function ChapterView({ chapter, onChoice, onBack, canGoBack }: ChapterViewProps)
       className="min-h-full w-full"
       style={{
         perspective: "1000px",
+        ...(isFlip && {
+          transformStyle: "preserve-3d",
+          WebkitTransformStyle: "preserve-3d",
+          backfaceVisibility: "hidden",
+          WebkitBackfaceVisibility: "hidden",
+        }),
         backgroundImage: chapter.bgImageUrl
           ? `url(${chapter.bgImageUrl})`
           : undefined,

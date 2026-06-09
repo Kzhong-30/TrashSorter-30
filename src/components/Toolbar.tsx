@@ -2,6 +2,7 @@ import { useStoryStore } from "@/store/storyStore";
 import type { StoryProject, Chapter, TransitionConfig } from "@/types/story";
 import {
   Play,
+  Pause,
   Download,
   Save,
   Upload,
@@ -9,9 +10,11 @@ import {
   PenTool,
   Clock,
   Volume2,
+  VolumeX,
+  X,
 } from "lucide-react";
-import { motion } from "framer-motion";
-import { useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
 
 const generateStaticHTML = (project: StoryProject) => {
   const projectJson = JSON.stringify(project);
@@ -53,14 +56,14 @@ const generateStaticHTML = (project: StoryProject) => {
   .slide-enter-up { opacity: 0; transform: translateY(100px); animation: slideInU var(--dur, 0.5s) ease forwards; }
   .slide-enter-down { opacity: 0; transform: translateY(-100px); animation: slideInD var(--dur, 0.5s) ease forwards; }
   .zoom-enter { opacity: 0; transform: scale(0.8); animation: zoomIn var(--dur, 0.5s) ease forwards; }
-  .flip-enter { opacity: 0; transform: rotateY(-90deg); animation: flipIn var(--dur, 0.5s) ease forwards; }
+  .flip-enter { opacity: 0; transform: rotateY(-90deg); animation: flipIn var(--dur, 0.5s) ease forwards; transform-style: preserve-3d; backface-visibility: hidden; }
   @keyframes fadeIn { to { opacity: 1; } }
   @keyframes slideInL { to { opacity: 1; transform: translateX(0); } }
   @keyframes slideInR { to { opacity: 1; transform: translateX(0); } }
   @keyframes slideInU { to { opacity: 1; transform: translateY(0); } }
   @keyframes slideInD { to { opacity: 1; transform: translateY(0); } }
   @keyframes zoomIn { to { opacity: 1; transform: scale(1); } }
-  @keyframes flipIn { to { opacity: 1; transform: rotateY(0); } }
+  @keyframes flipIn { to { opacity: 1; transform: rotateY(0); transform-style: preserve-3d; backface-visibility: hidden; } }
   .stagger > * { opacity: 0; }
   .stagger.animate > * { animation: fadeBlock 0.5s ease forwards; }
   @keyframes fadeBlock { to { opacity: 1; transform: translateY(0); } }
@@ -217,9 +220,49 @@ export default function Toolbar() {
   } = useStoryStore();
 
   const [showMenu, setShowMenu] = useState(false);
+  const [showBgSound, setShowBgSound] = useState(false);
   const [exportModal, setExportModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);
+
+  const [bgSoundPlaying, setBgSoundPlaying] = useState(false);
+  const [bgVolume, setBgVolume] = useState(0.3);
+  const bgSoundRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    document.title = project.title
+      ? `${project.title} · 交互式故事创作工具`
+      : "交互式故事创作工具";
+  }, [project.title]);
+
+  useEffect(() => {
+    if (project.bgSoundUrl) {
+      bgSoundRef.current = new Audio(project.bgSoundUrl);
+      bgSoundRef.current.loop = true;
+      bgSoundRef.current.volume = bgVolume;
+    }
+    return () => {
+      bgSoundRef.current?.pause();
+      bgSoundRef.current = null;
+      setBgSoundPlaying(false);
+    };
+  }, [project.bgSoundUrl]);
+
+  useEffect(() => {
+    if (bgSoundRef.current) {
+      bgSoundRef.current.volume = bgVolume;
+    }
+  }, [bgVolume]);
+
+  const toggleBgSoundPlay = () => {
+    if (!bgSoundRef.current || !project.bgSoundUrl) return;
+    if (bgSoundPlaying) {
+      bgSoundRef.current.pause();
+    } else {
+      bgSoundRef.current.play().catch(() => {});
+    }
+    setBgSoundPlaying(!bgSoundPlaying);
+  };
 
   const handleExport = () => {
     const html = generateStaticHTML(project);
@@ -388,30 +431,97 @@ export default function Toolbar() {
             )}
           </div>
 
-          <div className="relative group">
+          <div className="relative">
             <button
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white transition-all text-sm"
+              onClick={() => setShowBgSound(!showBgSound)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all text-sm ${
+                showBgSound || project.bgSoundUrl
+                  ? "bg-slate-700 text-white"
+                  : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"
+              }`}
               title="全局背景音效"
             >
               <Volume2 size={15} />
             </button>
-            <div className="absolute right-0 top-full mt-2 w-72 bg-slate-800 border border-slate-700 rounded-xl p-4 shadow-2xl z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
-              <label className="text-xs font-medium text-slate-400 block mb-2">
-                全局背景音效 URL
-              </label>
-              <input
-                type="url"
-                value={project.bgSoundUrl || ""}
-                onChange={(e) =>
-                  updateBgSound(e.target.value || undefined)
-                }
-                placeholder="可选：循环播放的背景音效..."
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-violet-500"
-              />
-              {project.bgSoundUrl && (
-                <audio src={project.bgSoundUrl} controls className="mt-3 w-full h-8" />
+            <AnimatePresence>
+              {showBgSound && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                  className="absolute right-0 top-full mt-2 w-80 bg-slate-800 border border-slate-700 rounded-xl p-4 shadow-2xl z-50"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-semibold text-white">
+                      全局背景音效
+                    </label>
+                    <button
+                      onClick={() => setShowBgSound(false)}
+                      className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-white"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <input
+                    type="url"
+                    value={project.bgSoundUrl || ""}
+                    onChange={(e) =>
+                      updateBgSound(e.target.value || undefined)
+                    }
+                    placeholder="音频 URL (mp3/wav/ogg)..."
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-violet-500 mb-3"
+                  />
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={toggleBgSoundPlay}
+                        disabled={!project.bgSoundUrl}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                          bgSoundPlaying
+                            ? "bg-violet-500 text-white shadow-sm shadow-violet-500/30"
+                            : "bg-slate-700 text-slate-200 hover:bg-slate-600"
+                        }`}
+                      >
+                        {bgSoundPlaying ? (
+                          <>
+                            <Pause size={12} /> 暂停试听
+                          </>
+                        ) : (
+                          <>
+                            <Play size={12} /> 试听
+                          </>
+                        )}
+                      </button>
+                      <div className="flex-1 flex items-center gap-2">
+                        <span className="text-slate-400 text-xs w-8">
+                          {Math.round(bgVolume * 100)}%
+                        </span>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          value={bgVolume}
+                          onChange={(e) =>
+                            setBgVolume(parseFloat(e.target.value))
+                          }
+                          className="flex-1 accent-violet-500"
+                        />
+                      </div>
+                    </div>
+                    {project.bgSoundUrl && (
+                      <div className="pt-2 border-t border-slate-700">
+                        <div className="text-xs text-emerald-400 mb-1 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          已设置循环背景音效
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
               )}
-            </div>
+            </AnimatePresence>
           </div>
 
           <button

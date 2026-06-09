@@ -1,14 +1,33 @@
 import { useStoryStore } from "@/store/storyStore";
-import { Plus, Trash2, GitBranch, Home, Layers } from "lucide-react";
+import { Plus, Trash2, GitBranch, Home, Layers, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Chapter } from "@/types/story";
 import { useState } from "react";
+import { ConfirmModal } from "./ConfirmModal";
 
 interface TreeNodeProps {
   chapter: Chapter;
   level: number;
   childrenIds: string[];
 }
+
+const collectDescendants = (
+  chapterId: string,
+  chapters: Record<string, Chapter>
+): string[] => {
+  const result: string[] = [];
+  const stack = [chapterId];
+  while (stack.length > 0) {
+    const cur = stack.pop()!;
+    Object.values(chapters).forEach((c) => {
+      if (c.parentId === cur) {
+        result.push(c.id);
+        stack.push(c.id);
+      }
+    });
+  }
+  return result;
+};
 
 const TreeNode = ({ chapter, level, childrenIds }: TreeNodeProps) => {
   const {
@@ -82,13 +101,13 @@ const TreeNode = ({ chapter, level, childrenIds }: TreeNodeProps) => {
           </span>
         )}
 
-        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           <button
             onClick={(e) => {
               e.stopPropagation();
               addChapter(chapter.id);
             }}
-            className={`p-1 rounded hover:bg-black/30 ${
+            className={`p-1 rounded hover:bg-black/30 transition-colors ${
               isSelected ? "text-white" : "text-slate-400 hover:text-emerald-400"
             }`}
             title="添加子章节"
@@ -132,6 +151,8 @@ export default function StoryTree() {
   const { project, addChapter, deleteChapter, selectedChapterId } =
     useStoryStore();
 
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
   const rootChildren = project.rootChapterId
     ? Object.values(project.chapters)
         .filter((c) => c.parentId === project.rootChapterId)
@@ -145,6 +166,28 @@ export default function StoryTree() {
   const chapterCount = Object.keys(project.chapters).length;
   const branchCount =
     chapterCount - (project.rootChapterId ? 1 : 0);
+
+  const selectedChapter = selectedChapterId
+    ? project.chapters[selectedChapterId]
+    : null;
+
+  const descendants =
+    selectedChapterId && selectedChapter
+      ? collectDescendants(selectedChapterId, project.chapters)
+      : [];
+
+  const descendantTitles = descendants
+    .slice(0, 6)
+    .map((id) => project.chapters[id]?.title)
+    .filter(Boolean);
+  const moreCount = descendants.length - descendantTitles.length;
+
+  const handleDelete = () => {
+    if (selectedChapterId) {
+      deleteChapter(selectedChapterId);
+    }
+    setConfirmDelete(false);
+  };
 
   return (
     <div className="h-full flex flex-col bg-slate-900/50 backdrop-blur-xl border-r border-slate-700/50">
@@ -189,16 +232,69 @@ export default function StoryTree() {
           <Plus size={16} />
           新建章节
         </button>
-        {selectedChapterId && (
-          <button
-            onClick={() => deleteChapter(selectedChapterId)}
-            className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-red-500/10 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/20 transition-all text-sm"
-          >
-            <Trash2 size={14} />
-            删除选中章节
-          </button>
-        )}
+        {selectedChapterId && !project.rootChapterId
+          ? selectedChapterId
+          : selectedChapter && (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className={`w-full flex items-center justify-center gap-2 py-2 px-4 rounded-lg transition-all text-sm ${
+                  project.rootChapterId === selectedChapterId
+                    ? "bg-slate-800/50 text-slate-500 cursor-not-allowed"
+                    : "bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20"
+                }`}
+                disabled={project.rootChapterId === selectedChapterId}
+              >
+                <Trash2 size={14} />
+                {project.rootChapterId === selectedChapterId
+                  ? "根章节不可删除"
+                  : "删除选中章节"}
+              </button>
+            )}
       </div>
+
+      <ConfirmModal
+        open={confirmDelete}
+        title={`删除「${selectedChapter?.title || ""}」`}
+        confirmText="确认删除"
+        cancelText="取消"
+        confirmDanger
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDelete(false)}
+        message={
+          <div className="space-y-2">
+            <div className="flex items-start gap-2 text-red-500">
+              <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+              <span className="text-sm">此操作无法撤销，请仔细确认。</span>
+            </div>
+            {descendants.length > 0 ? (
+              <div>
+                <p className="text-sm mb-2 font-medium">
+                  将同步删除该章节下所有
+                  <span className="text-red-500 font-bold mx-1">
+                    {descendants.length}
+                  </span>
+                  个子章节：
+                </p>
+                <ul className="text-xs space-y-1 text-slate-500 bg-slate-900/50 rounded-lg p-2.5 max-h-32 overflow-y-auto">
+                  {descendantTitles.map((t, i) => (
+                    <li key={i} className="flex items-center gap-1.5">
+                      <span className="w-1 h-1 rounded-full bg-slate-500" />
+                      {t}
+                    </li>
+                  ))}
+                  {moreCount > 0 && (
+                    <li className="text-slate-500 italic">
+                      还有 {moreCount} 个章节未显示...
+                    </li>
+                  )}
+                </ul>
+              </div>
+            ) : (
+              <p className="text-sm">该章节没有子章节，将直接删除。</p>
+            )}
+          </div>
+        }
+      />
     </div>
   );
 }

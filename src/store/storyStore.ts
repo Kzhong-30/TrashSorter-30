@@ -91,15 +91,19 @@ interface StoryStore extends StoryState {
   loadProject: (project: StoryProject) => void;
 }
 
+const defaultProject = createDefaultProject();
+
 export const useStoryStore = create<StoryStore>()(
   persist(
     (set, get) => ({
-      project: createDefaultProject(),
-      selectedChapterId: null,
+      project: defaultProject,
+      selectedChapterId: defaultProject.rootChapterId,
       selectedBlockId: null,
       isPreviewMode: false,
       currentPreviewChapterId: null,
-      visitedChapters: [],
+      visitedChapters: defaultProject.rootChapterId
+        ? [defaultProject.rootChapterId]
+        : [],
 
       setProject: (project) =>
         set({ project: { ...project, updatedAt: Date.now() } }),
@@ -488,22 +492,24 @@ export const useStoryStore = create<StoryStore>()(
         const newProject = createDefaultProject();
         set({
           project: newProject,
-          selectedChapterId: null,
+          selectedChapterId: newProject.rootChapterId,
           selectedBlockId: null,
           isPreviewMode: false,
           currentPreviewChapterId: null,
-          visitedChapters: [],
+          visitedChapters: newProject.rootChapterId
+            ? [newProject.rootChapterId]
+            : [],
         });
       },
 
       loadProject: (project) => {
         set({
           project,
-          selectedChapterId: null,
+          selectedChapterId: project.rootChapterId,
           selectedBlockId: null,
           isPreviewMode: false,
           currentPreviewChapterId: null,
-          visitedChapters: [],
+          visitedChapters: project.rootChapterId ? [project.rootChapterId] : [],
         });
       },
     }),
@@ -512,6 +518,30 @@ export const useStoryStore = create<StoryStore>()(
       partialize: (state) => ({
         project: state.project,
       }),
+      onRehydrateStorage: () => (state, error) => {
+        if (error || !state || !state.project || !state.project.chapters) {
+          const fallback = createDefaultProject();
+          state?.setProject?.(fallback);
+          if (state) {
+            state.selectedChapterId = fallback.rootChapterId;
+            state.visitedChapters = fallback.rootChapterId
+              ? [fallback.rootChapterId]
+              : [];
+          }
+          return;
+        }
+        const validId =
+          state.project.rootChapterId &&
+          state.project.chapters[state.project.rootChapterId];
+        if (
+          validId &&
+          (!state.selectedChapterId ||
+            !state.project.chapters[state.selectedChapterId])
+        ) {
+          state.selectedChapterId = state.project.rootChapterId;
+          state.visitedChapters = [state.project.rootChapterId];
+        }
+      },
     }
   )
 );
